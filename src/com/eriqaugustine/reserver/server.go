@@ -7,17 +7,19 @@ import (
     "net/http"
     "fmt"
     "io/ioutil"
+    //"strings"
 )
 
-var addr = flag.String("addr", ":1718", "http service address") // Q=17, R=18
 
 var templ = template.Must(template.New("qr").Parse(templateStr))
 var temp2 = template.Must(template.New("qr").Parse(templateStr2))
 
 func main() {
+    var port *string = flag.String("port", "3030", "service port");
     flag.Parse()
+
     http.Handle("/", http.HandlerFunc(QR))
-    err := http.ListenAndServe(":8080", nil)
+    err := http.ListenAndServe(":" + *port, nil)
     if err != nil {
         log.Fatal("ListenAndServe:", err)
     }
@@ -26,21 +28,31 @@ func main() {
 func QR(w http.ResponseWriter, req *http.Request) {
     // templ.Execute(w, req.FormValue("s"))
     response, err := http.Get(req.FormValue("s"));
+
+   //TEST
+   println("^^^^");
+   println(req.URL.String());
+   println(req.FormValue("s"));
+   println("vvvv");
+
     if err != nil {
-        fmt.Printf("%s", err)
+        fmt.Printf("%s\n", err)
         //os.Exit(1)
     } else {
         defer response.Body.Close()
         contents, err := ioutil.ReadAll(response.Body)
         if err != nil {
-            fmt.Printf("%s", err)
+            fmt.Printf("%s\n", err)
             //os.Exit(1)
         }
         //fmt.Printf("%s\n", string(contents))
         //templ.Execute(w, string(contents));
-        w.Write([]byte(string(contents)));
+        //w.Write([]byte(string(contents)));
         //println(string(contents));
-        //temp2.Execute(w, string(contents));
+        //templ.Execute(w, template.HTML(string(contents)));
+        //temp2.Execute(w, template.HTML(strings.Replace(string(contents), "'", "\\'", -1)));
+        //temp2.Execute(w, strings.Replace(string(contents), "'", "\\'", -1));
+        temp2.Execute(w, template.HTML(string(contents)));
     }
 }
 
@@ -57,13 +69,36 @@ const templateStr2 = `
 </head>
 <body>
 {{if .}}
-<iframe style="height: 100%; width: 100%;">
+<iframe id=targetContent seamless style="height: 100%; width: 100%;"></iframe>
+<script type="text/javascript">
+var doc = document.getElementById('targetContent').contentWindow.document;
+doc.open();
+doc.write('{{.}}');
+doc.close();
+</script>
+{{else}}
+<p>No Target</p>
+{{end}}
+</body>
+</html>
+`
+
+/*
+const templateStr2 = `
+<html>
+<head>
+<title>Reserve</title>
+</head>
+<body>
+{{if .}}
+<iframe seamless style="height: 100%; width: 100%;">
 {{.}}
 </iframe>
 {{end}}
 </body>
 </html>
 `
+*/
 
 /*
 const templateStr = `
