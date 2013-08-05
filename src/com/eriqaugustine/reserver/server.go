@@ -1,120 +1,81 @@
 package main
 
 import (
-    "flag"
-    "html/template"
-    "log"
-    "net/http"
-    "fmt"
-    "io/ioutil"
-    //"strings"
+   "flag"
+   "html/template"
+   "log"
+   "net/http"
+   "fmt"
+   "io/ioutil"
+   //"strings"
+   "com/eriqaugustine/reserver/reserve"
 )
 
-
-var templ = template.Must(template.New("qr").Parse(templateStr))
-var temp2 = template.Must(template.New("qr").Parse(templateStr2))
-
 func main() {
-    var port *string = flag.String("port", "3030", "service port");
-    flag.Parse()
+   var port *string = flag.String("port", "3030", "service port");
+   flag.Parse()
 
-    http.Handle("/", http.HandlerFunc(QR))
-    err := http.ListenAndServe(":" + *port, nil)
-    if err != nil {
-        log.Fatal("ListenAndServe:", err)
-    }
+   http.Handle("/", http.HandlerFunc(Reserve))
+   err := http.ListenAndServe(":" + *port, nil)
+   if err != nil {
+      log.Fatal("ListenAndServe:", err)
+   }
 }
 
-func QR(w http.ResponseWriter, req *http.Request) {
-    // templ.Execute(w, req.FormValue("s"))
-    response, err := http.Get(req.FormValue("s"));
-
+func Reserve(response http.ResponseWriter, request *http.Request) {
    //TEST
    println("^^^^");
-   println(req.URL.String());
-   println(req.FormValue("s"));
+   println(request.URL.String());
+   println(request.FormValue("target"));
+   println(request.FormValue("type"));
    println("vvvv");
 
-    if err != nil {
-        fmt.Printf("%s\n", err)
-        //os.Exit(1)
-    } else {
-        defer response.Body.Close()
-        contents, err := ioutil.ReadAll(response.Body)
-        if err != nil {
-            fmt.Printf("%s\n", err)
-            //os.Exit(1)
-        }
-        //fmt.Printf("%s\n", string(contents))
-        //templ.Execute(w, string(contents));
-        //w.Write([]byte(string(contents)));
-        //println(string(contents));
-        //templ.Execute(w, template.HTML(string(contents)));
-        //temp2.Execute(w, template.HTML(strings.Replace(string(contents), "'", "\\'", -1)));
-        //temp2.Execute(w, strings.Replace(string(contents), "'", "\\'", -1));
-        temp2.Execute(w, template.HTML(string(contents)));
-    }
+   switch request.FormValue("type") {
+      case "main":
+         println("main");
+         var contents *string = getModifiedMain(request.FormValue("target"));
+         if (contents != nil) {
+            reserve.BasePageTemplate.Execute(response, template.HTML(*contents));
+         }
+         return;
+      case "image":
+         println("image");
+      case "js":
+         println("js");
+      case "css":
+         println("css");
+      default:
+         println("Default");
+   }
+
+   // Fall through to 404.
+   http.NotFound(response, request);
+
+   //fmt.Printf("%s\n", string(contents))
+   //templ.Execute(w, string(contents));
+   //w.Write([]byte(string(contents)));
+   //println(string(contents));
+   //templ.Execute(w, template.HTML(string(contents)));
+   //temp2.Execute(w, template.HTML(strings.Replace(string(contents), "'", "\\'", -1)));
+   //temp2.Execute(w, strings.Replace(string(contents), "'", "\\'", -1));
 }
 
-const templateStr = `
-{{if .}}
-{{.}}
-{{end}}
-`
+func getModifiedMain(target string) *string {
+   response, err := http.Get(target);
 
-const templateStr2 = `
-<html>
-<head>
-<title>Reserve</title>
-</head>
-<body>
-{{if .}}
-<iframe id=targetContent seamless style="height: 100%; width: 100%;"></iframe>
-<script type="text/javascript">
-var doc = document.getElementById('targetContent').contentWindow.document;
-doc.open();
-doc.write('{{.}}');
-doc.close();
-</script>
-{{else}}
-<p>No Target</p>
-{{end}}
-</body>
-</html>
-`
+   if (err != nil) {
+      fmt.Printf("Fetch Error: %s\n", err)
+      return nil;
+   }
 
-/*
-const templateStr2 = `
-<html>
-<head>
-<title>Reserve</title>
-</head>
-<body>
-{{if .}}
-<iframe seamless style="height: 100%; width: 100%;">
-{{.}}
-</iframe>
-{{end}}
-</body>
-</html>
-`
-*/
+   defer response.Body.Close();
+   contents, err := ioutil.ReadAll(response.Body);
 
-/*
-const templateStr = `
-<html>
-<head>
-<title>Reserve</title>
-</head>
-<body>
-{{if .}}
-<iframe style="height: 100%; width: 100%;"src="{{.}}" />
-<br>
-{{.}}
-<br>
-<br>
-{{end}}
-</body>
-</html>
-`
-*/
+   if (err != nil) {
+      fmt.Printf("Read Body Error: %s\n", err)
+      return nil;
+   }
+
+   var rtn string = string(contents);
+   return &rtn;
+}
