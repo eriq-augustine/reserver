@@ -37,11 +37,12 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
       fmt.Printf("Url parse: %s\n", err)
    }
 
-   var urlBase = fmt.Sprintf("%s://%s", targetUrl.Scheme, targetUrl.Host);
+   //TEST
+   fmt.Println(targetUrl);
 
    switch request.FormValue("type") {
       case "main":
-         var contents *string = getModifiedMain(target, urlBase);
+         var contents *string = getModifiedMain(target, targetUrl);
          if (contents != nil) {
             reserve.BasePageTemplate.Execute(response, template.HTML(*contents));
             return;
@@ -93,7 +94,7 @@ func getResource(target string) *[]byte {
    return &contents;
 }
 
-func getModifiedMain(target string, urlBase string) *string {
+func getModifiedMain(target string, targetUrl *url.URL) *string {
    response, err := http.Get(target);
 
    if (err != nil) {
@@ -103,14 +104,14 @@ func getModifiedMain(target string, urlBase string) *string {
 
    defer response.Body.Close();
 
-   var rtn *string = replaceLinks(response.Body, urlBase);
+   var rtn *string = replaceLinks(response.Body, targetUrl);
    if (rtn != nil) {
       return rtn;
    }
    return nil;
 }
 
-func replaceLinks(responseBody io.Reader, urlBase string) *string {
+func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
    tree, err := h5.New(responseBody);
 
    if (err != nil) {
@@ -125,23 +126,23 @@ func replaceLinks(responseBody io.Reader, urlBase string) *string {
             case "img":
                var link *string = getAttr(&node.Attr, "src");
                if (link != nil) {
-                  var newLink string = fixLink(*link, "image", urlBase);
+                  var newLink string = fixLink(*link, "image", targetUrl);
                   replaceAttr(&node.Attr, "src", newLink);
                }
             case "style":
                // inline CSS
-               node.FirstChild.Data = fixCSS(node.FirstChild.Data, urlBase);
+               node.FirstChild.Data = fixCSS(node.FirstChild.Data, targetUrl);
             case "link":
                // CSS, favicon?
                var link *string = getAttr(&node.Attr, "href");
                if (link != nil) {
-                  var newLink = identifyAndFixLink(*link, urlBase);
+                  var newLink = identifyAndFixLink(*link, targetUrl);
                   replaceAttr(&node.Attr, "href", newLink);
                }
             case "script":
                var link *string = getAttr(&node.Attr, "src");
                if (link != nil) {
-                  var newLink string = fixLink(*link, "js", urlBase);
+                  var newLink string = fixLink(*link, "js", targetUrl);
                   replaceAttr(&node.Attr, "src", newLink);
                }
          }
@@ -152,44 +153,40 @@ func replaceLinks(responseBody io.Reader, urlBase string) *string {
    return &rtn;
 }
 
-func identifyAndFixLink(link string, urlBase string) string {
+func identifyAndFixLink(link string, targetUrl *url.URL) string {
    if (strings.HasSuffix(link, ".png") ||
        strings.HasSuffix(link, ".jpg") ||
        strings.HasSuffix(link, ".jpeg") ||
        strings.HasSuffix(link, ".ico") ||
        strings.HasSuffix(link, ".gif")) {
-      return fixLink(link, "image", urlBase);
+      return fixLink(link, "image", targetUrl);
    } else if (strings.HasSuffix(link, ".css")) {
-      return fixLink(link, "css", urlBase);
+      return fixLink(link, "css", targetUrl);
    } else if (strings.HasSuffix(link, ".js")) {
-      return fixLink(link, "js", urlBase);
+      return fixLink(link, "js", targetUrl);
    } else {
-      return fixLink(link, "main", urlBase);
+      return fixLink(link, "main", targetUrl);
    }
 }
 
-func fixCSS(css string, urlBase string) string {
+func fixCSS(css string, targetUrl *url.URL) string {
    re := regexp.MustCompile(`url\s*\(['|"]?(.*)['|"]?\)`);
    return re.ReplaceAllStringFunc(css, func(urlRule string) string {
       var link = re.ReplaceAllString(urlRule, "$1");
 
       // TODO(eriq): Potential problem is url is unescaped (because of quotes).
-      return fmt.Sprintf("url: ('%s')", identifyAndFixLink(link, urlBase));
+      return fmt.Sprintf("url: ('%s')", identifyAndFixLink(link, targetUrl));
    });
 }
 
-func fixLink(link string, linkType string, urlBase string) string {
-   //TODO(eriq): Relative links.
-   if (strings.HasPrefix(link, "//")) {
-      // Absolute.
-      return fmt.Sprintf("/?type=%s&target=http:%s", linkType, link);
-   } else if (strings.HasPrefix(link, "/")) {
-      return fmt.Sprintf("/?type=%s&target=%s%s", linkType, urlBase, link);
-   } else {
-      return fmt.Sprintf("/?type=%s&target=%s", linkType, link);
+func fixLink(link string, linkType string, targetUrl *url.URL) string {
+   url, err := targetUrl.Parse(link);
+
+   if (err != nil) {
+      return link;
    }
 
-   return link;
+   return fmt.Sprintf("/?type=%s&target=%s", linkType, url.String());
 }
 
 func getAttr(attrs *[]html.Attribute, key string) *string {
