@@ -87,8 +87,9 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
       case REQUEST_TYPE_CSS:
          var contents *[]byte = getResource(target);
          if (contents != nil) {
+            var fixedContents string = fixCSS(string(*contents), targetUrl);
             var modTime time.Time;
-            var contentReader *bytes.Reader = bytes.NewReader(*contents);
+            var contentReader *bytes.Reader = bytes.NewReader([]byte(fixedContents));
             http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
             return;
          }
@@ -202,9 +203,13 @@ func identifyAndFixLink(link string, targetUrl *url.URL) string {
 }
 
 func fixCSS(css string, targetUrl *url.URL) string {
-   re := regexp.MustCompile(`url\s*\(['|"]?(.*)['|"]?\)`);
+   re := regexp.MustCompile(`url\s*\(['"]?(.*)['"]?\)`);
    return re.ReplaceAllStringFunc(css, func(urlRule string) string {
       var link = re.ReplaceAllString(urlRule, "$1");
+
+      // TODO(eriq): The trailing "'" should not be caught by the group.
+      //  Fix the regex and remove this.
+      link = strings.TrimRight(link, "'\"");
 
       // TODO(eriq): Potential problem is url is unescaped (because of quotes).
       return fmt.Sprintf("url('%s')", identifyAndFixLink(link, targetUrl));
