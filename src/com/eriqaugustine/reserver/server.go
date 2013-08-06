@@ -181,45 +181,42 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
       if (node.Type == html.ElementNode) {
          switch node.Data {
             case "a":
-               var link *string = getAttr(&node.Attr, "href");
-               if (link != nil) {
-                  var newLink string = fixLink(*link, REQUEST_TYPE_MAIN, targetUrl);
-                  replaceAttr(&node.Attr, "href", newLink);
-               }
+               fixAttribute(&node.Attr, "href", targetUrl, REQUEST_TYPE_MAIN);
             case "img":
-               var link *string = getAttr(&node.Attr, "src");
-               if (link != nil) {
-                  var newLink string = fixLink(*link, REQUEST_TYPE_IMAGE, targetUrl);
-                  replaceAttr(&node.Attr, "src", newLink);
-               }
+               fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_IMAGE);
             case "style":
                // inline CSS
                node.FirstChild.Data = fixCSS(node.FirstChild.Data, targetUrl);
             case "link":
                // CSS, favicon?
-               var link *string = getAttr(&node.Attr, "href");
-               if (link != nil) {
-                  var newLink = identifyAndFixLink(*link, targetUrl);
-                  replaceAttr(&node.Attr, "href", newLink);
-               }
+               fixAttribute(&node.Attr, "href", targetUrl, REQUEST_TYPE_UNKNOWN);
             case "script":
-               var link *string = getAttr(&node.Attr, "src");
-               if (link != nil) {
-                  var newLink string = fixLink(*link, REQUEST_TYPE_JS, targetUrl);
-                  replaceAttr(&node.Attr, "src", newLink);
-               }
+               fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_JS);
             case "input":
-               var link *string = getAttr(&node.Attr, "src");
-               if (link != nil) {
-                  var newLink = identifyAndFixLink(*link, targetUrl);
-                  replaceAttr(&node.Attr, "src", newLink);
-               }
+               fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_UNKNOWN);
+            case "form":
+               fixAttribute(&node.Attr, "action", targetUrl, REQUEST_TYPE_UNKNOWN);
          }
       }
    });
 
    var rtn = tree.String();
    return &rtn;
+}
+
+func fixAttribute(attrs *[]html.Attribute, key string,
+                  targetUrl *url.URL, requestType int) {
+   var link *string = getAttr(attrs, key);
+   if (link != nil) {
+      var newLink string;
+      if (requestType == REQUEST_TYPE_UNKNOWN) {
+         newLink = identifyAndFixLink(*link, targetUrl);
+      } else {
+         newLink = fixLink(*link, requestType, targetUrl);
+      }
+
+      replaceAttr(attrs, key, newLink);
+   }
 }
 
 func identifyLink(link string) int {
