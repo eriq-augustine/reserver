@@ -14,7 +14,17 @@ import (
    "code.google.com/p/go-html-transform/h5"
    "code.google.com/p/go.net/html"
    "regexp"
+   "strconv"
 )
+
+const (
+   REQUEST_TYPE_MAIN int = iota
+   REQUEST_TYPE_IMAGE
+   REQUEST_TYPE_JS
+   REQUEST_TYPE_CSS
+   REQUEST_TYPE_UNKNOWN
+   NUM_REQUEST_TYPES
+);
 
 func main() {
    var port *string = flag.String("port", "3030", "service port");
@@ -30,6 +40,11 @@ func main() {
 func Reserve(response http.ResponseWriter, request *http.Request) {
    var target string = request.FormValue("target");
 
+   if (target == "") {
+      http.NotFound(response, request);
+      return;
+   }
+
    // TODO(eriq): Does not handle user info.
    targetUrl, err := url.Parse(target);
 
@@ -37,29 +52,33 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
       fmt.Printf("Url parse: %s\n", err)
    }
 
-   //TEST
-   fmt.Println(targetUrl);
+   intType, err := strconv.Atoi(request.FormValue("type"));
 
-   switch request.FormValue("type") {
-      case "main":
+   if (err != nil) {
+      fmt.Println("Type is not an int: ", request.FormValue("type"));
+      intType = REQUEST_TYPE_UNKNOWN;
+   }
+
+   switch intType {
+      case REQUEST_TYPE_MAIN:
          var contents *string = getModifiedMain(target, targetUrl);
          if (contents != nil) {
             reserve.BasePageTemplate.Execute(response, template.HTML(*contents));
             return;
          }
-      case "image":
+      case REQUEST_TYPE_IMAGE:
          var contents *[]byte = getResource(target);
          if (contents != nil) {
             response.Write(*contents);
             return;
          }
-      case "js":
+      case REQUEST_TYPE_JS:
          var contents *[]byte = getResource(target);
          if (contents != nil) {
             response.Write(*contents);
             return;
          }
-      case "css":
+      case REQUEST_TYPE_CSS:
          var contents *[]byte = getResource(target);
          if (contents != nil) {
             response.Write(*contents);
@@ -67,7 +86,8 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
          }
       default:
          println("TODO: Default");
-         println(request.URL.String());
+         fmt.Println("   Target: ", targetUrl);
+         fmt.Println("   Url: ", request.URL);
    }
 
    // Fall through to 404.
@@ -126,7 +146,7 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
             case "img":
                var link *string = getAttr(&node.Attr, "src");
                if (link != nil) {
-                  var newLink string = fixLink(*link, "image", targetUrl);
+                  var newLink string = fixLink(*link, REQUEST_TYPE_IMAGE, targetUrl);
                   replaceAttr(&node.Attr, "src", newLink);
                }
             case "style":
@@ -142,7 +162,7 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
             case "script":
                var link *string = getAttr(&node.Attr, "src");
                if (link != nil) {
-                  var newLink string = fixLink(*link, "js", targetUrl);
+                  var newLink string = fixLink(*link, REQUEST_TYPE_JS, targetUrl);
                   replaceAttr(&node.Attr, "src", newLink);
                }
          }
@@ -153,20 +173,24 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
    return &rtn;
 }
 
-func identifyAndFixLink(link string, targetUrl *url.URL) string {
+func identifyLink(link string) int {
    if (strings.HasSuffix(link, ".png") ||
        strings.HasSuffix(link, ".jpg") ||
        strings.HasSuffix(link, ".jpeg") ||
        strings.HasSuffix(link, ".ico") ||
        strings.HasSuffix(link, ".gif")) {
-      return fixLink(link, "image", targetUrl);
+      return REQUEST_TYPE_IMAGE;
    } else if (strings.HasSuffix(link, ".css")) {
-      return fixLink(link, "css", targetUrl);
+      return REQUEST_TYPE_CSS;
    } else if (strings.HasSuffix(link, ".js")) {
-      return fixLink(link, "js", targetUrl);
+      return REQUEST_TYPE_JS;
    } else {
-      return fixLink(link, "main", targetUrl);
+      return REQUEST_TYPE_UNKNOWN;
    }
+}
+
+func identifyAndFixLink(link string, targetUrl *url.URL) string {
+   return fixLink(link, identifyLink(link), targetUrl);
 }
 
 func fixCSS(css string, targetUrl *url.URL) string {
@@ -179,14 +203,14 @@ func fixCSS(css string, targetUrl *url.URL) string {
    });
 }
 
-func fixLink(link string, linkType string, targetUrl *url.URL) string {
+func fixLink(link string, linkType int, targetUrl *url.URL) string {
    url, err := targetUrl.Parse(link);
 
    if (err != nil) {
       return link;
    }
 
-   return fmt.Sprintf("/?type=%s&target=%s", linkType, url.String());
+   return fmt.Sprintf("/?type=%d&target=%s", linkType, url.String());
 }
 
 func getAttr(attrs *[]html.Attribute, key string) *string {
