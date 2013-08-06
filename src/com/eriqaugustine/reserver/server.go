@@ -15,6 +15,8 @@ import (
    "code.google.com/p/go.net/html"
    "regexp"
    "strconv"
+   "time"
+   "bytes"
 )
 
 const (
@@ -69,19 +71,25 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
       case REQUEST_TYPE_IMAGE:
          var contents *[]byte = getResource(target);
          if (contents != nil) {
-            response.Write(*contents);
+            var modTime time.Time;
+            var contentReader *bytes.Reader = bytes.NewReader(*contents);
+            http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
             return;
          }
       case REQUEST_TYPE_JS:
          var contents *[]byte = getResource(target);
          if (contents != nil) {
-            response.Write(*contents);
+            var modTime time.Time;
+            var contentReader *bytes.Reader = bytes.NewReader(*contents);
+            http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
             return;
          }
       case REQUEST_TYPE_CSS:
          var contents *[]byte = getResource(target);
          if (contents != nil) {
-            response.Write(*contents);
+            var modTime time.Time;
+            var contentReader *bytes.Reader = bytes.NewReader(*contents);
+            http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
             return;
          }
       default:
