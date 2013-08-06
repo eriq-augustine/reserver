@@ -40,6 +40,7 @@ func main() {
 }
 
 func Reserve(response http.ResponseWriter, request *http.Request) {
+   var userAgent string = request.UserAgent();
    var target string = request.FormValue("target");
 
    if (target == "") {
@@ -69,13 +70,13 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
 
    switch intType {
       case REQUEST_TYPE_MAIN:
-         var contents *string = getModifiedMain(unescapeTarget, targetUrl);
+         var contents *string = getModifiedMain(targetUrl, userAgent);
          if (contents != nil) {
             reserve.BasePageTemplate.Execute(response, template.HTML(*contents));
             return;
          }
       case REQUEST_TYPE_IMAGE:
-         var contents *[]byte = getResource(unescapeTarget);
+         var contents *[]byte = getResource(targetUrl, userAgent);
          if (contents != nil) {
             var modTime time.Time;
             var contentReader *bytes.Reader = bytes.NewReader(*contents);
@@ -83,7 +84,7 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
             return;
          }
       case REQUEST_TYPE_JS:
-         var contents *[]byte = getResource(unescapeTarget);
+         var contents *[]byte = getResource(targetUrl, userAgent);
          if (contents != nil) {
             var modTime time.Time;
             var contentReader *bytes.Reader = bytes.NewReader(*contents);
@@ -91,7 +92,7 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
             return;
          }
       case REQUEST_TYPE_CSS:
-         var contents *[]byte = getResource(unescapeTarget);
+         var contents *[]byte = getResource(targetUrl, userAgent);
          if (contents != nil) {
             var fixedContents string = fixCSS(string(*contents), targetUrl);
             var modTime time.Time;
@@ -109,12 +110,20 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
    http.NotFound(response, request);
 }
 
-func getResource(target string) *[]byte {
-   response, err := http.Get(target);
+func getResource(targetUrl *url.URL, userAgent string) *[]byte {
+   client := &http.Client{};
 
-   if (err != nil) {
-      // TODO(eriq): Better error logging.
-      fmt.Printf("Image Fetch Error: %s\n", err)
+   request, err := http.NewRequest("GET", targetUrl.String(), nil);
+   if err != nil {
+      fmt.Printf("Request Error: %s\n", err);
+      return nil;
+   }
+
+   request.Header.Set("User-Agent", userAgent);
+
+   response, err := client.Do(request);
+   if err != nil {
+      fmt.Printf("Fetch Error: %s\n", err)
       return nil;
    }
 
@@ -122,17 +131,26 @@ func getResource(target string) *[]byte {
    contents, err := ioutil.ReadAll(response.Body);
 
    if (err != nil) {
-      fmt.Printf("Image Read Error: %s\n", err)
+      fmt.Printf("Resource Read Error: %s\n", err)
       return nil;
    }
 
    return &contents;
 }
 
-func getModifiedMain(target string, targetUrl *url.URL) *string {
-   response, err := http.Get(target);
+func getModifiedMain(targetUrl *url.URL, userAgent string) *string {
+   client := &http.Client{};
 
-   if (err != nil) {
+   request, err := http.NewRequest("GET", targetUrl.String(), nil);
+   if err != nil {
+      fmt.Printf("Request Error: %s\n", err);
+      return nil;
+   }
+
+   request.Header.Set("User-Agent", userAgent);
+
+   response, err := client.Do(request);
+   if err != nil {
       fmt.Printf("Fetch Error: %s\n", err)
       return nil;
    }
