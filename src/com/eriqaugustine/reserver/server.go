@@ -203,6 +203,8 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
                fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_UNKNOWN);
             case "form":
                fixAttribute(&node.Attr, "action", targetUrl, REQUEST_TYPE_UNKNOWN);
+            case "iframe":
+               fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_MAIN);
          }
       }
    });
