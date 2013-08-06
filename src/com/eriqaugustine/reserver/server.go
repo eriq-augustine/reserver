@@ -207,7 +207,7 @@ func fixCSS(css string, targetUrl *url.URL) string {
       var link = re.ReplaceAllString(urlRule, "$1");
 
       // TODO(eriq): Potential problem is url is unescaped (because of quotes).
-      return fmt.Sprintf("url: ('%s')", identifyAndFixLink(link, targetUrl));
+      return fmt.Sprintf("url('%s')", identifyAndFixLink(link, targetUrl));
    });
 }
 
