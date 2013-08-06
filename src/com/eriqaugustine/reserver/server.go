@@ -1,22 +1,22 @@
 package main
 
 import (
-   "flag"
-   "html/template"
-   "log"
-   "net/http"
-   "net/url"
-   "fmt"
-   "io/ioutil"
-   "io"
-   "strings"
    "com/eriqaugustine/reserver/reserve"
    "code.google.com/p/go-html-transform/h5"
    "code.google.com/p/go.net/html"
+   "bytes"
+   "flag"
+   "fmt"
+   "html/template"
+   "io"
+   "io/ioutil"
+   "log"
+   "net/http"
+   "net/url"
    "regexp"
    "strconv"
+   "strings"
    "time"
-   "bytes"
 )
 
 const (

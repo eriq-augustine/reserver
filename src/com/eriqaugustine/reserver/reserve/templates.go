@@ -7,6 +7,4 @@ import (
 var BasePageTemplate =
    template.Must(template.New("basePage").Parse(BasePageTemplateStr));
 
-const BasePageTemplateStr = `
-{{.}}
-`;
+const BasePageTemplateStr = `{{.}}`;
