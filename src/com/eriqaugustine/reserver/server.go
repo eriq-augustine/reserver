@@ -76,28 +76,15 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
             return;
          }
       case REQUEST_TYPE_IMAGE:
-         var contents *[]byte = getResource(targetUrl, userAgent);
-         if (contents != nil) {
-            var modTime time.Time;
-            var contentReader *bytes.Reader = bytes.NewReader(*contents);
-            http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
+         if (getAndServeResource(response, request, targetUrl, userAgent, nil)) {
             return;
          }
       case REQUEST_TYPE_JS:
-         var contents *[]byte = getResource(targetUrl, userAgent);
-         if (contents != nil) {
-            var modTime time.Time;
-            var contentReader *bytes.Reader = bytes.NewReader(*contents);
-            http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
+         if (getAndServeResource(response, request, targetUrl, userAgent, nil)) {
             return;
          }
       case REQUEST_TYPE_CSS:
-         var contents *[]byte = getResource(targetUrl, userAgent);
-         if (contents != nil) {
-            var fixedContents string = fixCSS(string(*contents), targetUrl);
-            var modTime time.Time;
-            var contentReader *bytes.Reader = bytes.NewReader([]byte(fixedContents));
-            http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
+         if (getAndServeResource(response, request, targetUrl, userAgent, fixCSS)) {
             return;
          }
       default:
@@ -108,6 +95,25 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
 
    // Fall through to 404.
    http.NotFound(response, request);
+}
+
+func getAndServeResource(response http.ResponseWriter, request *http.Request,
+                         targetUrl *url.URL, userAgent string,
+                         contentFix func(string, *url.URL) string) bool {
+   var contents *[]byte = getResource(targetUrl, userAgent);
+   if (contents != nil) {
+      var fixedContents string = string(*contents);
+      if (contentFix != nil) {
+        fixedContents = contentFix(fixedContents, targetUrl);
+      }
+
+      var modTime time.Time;
+      var contentReader *bytes.Reader = bytes.NewReader([]byte(fixedContents));
+      http.ServeContent(response, request, targetUrl.Path, modTime,  contentReader);
+      return true;
+   }
+
+   return false;
 }
 
 func getResource(targetUrl *url.URL, userAgent string) *[]byte {
