@@ -53,9 +53,12 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
             return;
          }
       case "js":
-         println("TODO: js");
+         var contents *[]byte = getResource(target);
+         if (contents != nil) {
+            response.Write(*contents);
+            return;
+         }
       case "css":
-         println("TODO: css");
          var contents *[]byte = getResource(target);
          if (contents != nil) {
             response.Write(*contents);
@@ -121,18 +124,26 @@ func replaceLinks(responseBody io.Reader, urlBase string) *string {
                // TODO(eriq).
             case "img":
                var link *string = getAttr(&node.Attr, "src");
-               var newLink string = fixLink(*link, "image", urlBase);
-               replaceAttr(&node.Attr, "src", newLink);
+               if (link != nil) {
+                  var newLink string = fixLink(*link, "image", urlBase);
+                  replaceAttr(&node.Attr, "src", newLink);
+               }
             case "style":
                // inline CSS
-               fmt.Println("CSS 1: ", node.FirstChild.Data);
                node.FirstChild.Data = fixCSS(node.FirstChild.Data, urlBase);
-               fmt.Println("CSS 2: ", node.FirstChild.Data);
             case "link":
                // CSS, favicon?
                var link *string = getAttr(&node.Attr, "href");
-               var newLink = identifyAndFixLink(*link, urlBase);
-               replaceAttr(&node.Attr, "href", newLink);
+               if (link != nil) {
+                  var newLink = identifyAndFixLink(*link, urlBase);
+                  replaceAttr(&node.Attr, "href", newLink);
+               }
+            case "script":
+               var link *string = getAttr(&node.Attr, "src");
+               if (link != nil) {
+                  var newLink string = fixLink(*link, "js", urlBase);
+                  replaceAttr(&node.Attr, "src", newLink);
+               }
          }
       }
    });
