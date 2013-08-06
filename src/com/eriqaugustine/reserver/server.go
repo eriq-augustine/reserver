@@ -174,6 +174,12 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
                   var newLink string = fixLink(*link, REQUEST_TYPE_JS, targetUrl);
                   replaceAttr(&node.Attr, "src", newLink);
                }
+            case "input":
+               var link *string = getAttr(&node.Attr, "src");
+               if (link != nil) {
+                  var newLink string = fixLink(*link, REQUEST_TYPE_JS, targetUrl);
+                  replaceAttr(&node.Attr, "src", newLink);
+               }
          }
       }
    });
