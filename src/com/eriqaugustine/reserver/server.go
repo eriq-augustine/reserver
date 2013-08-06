@@ -151,7 +151,11 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
       if (node.Type == html.ElementNode) {
          switch node.Data {
             case "a":
-               // TODO(eriq).
+               var link *string = getAttr(&node.Attr, "href");
+               if (link != nil) {
+                  var newLink string = fixLink(*link, REQUEST_TYPE_MAIN, targetUrl);
+                  replaceAttr(&node.Attr, "href", newLink);
+               }
             case "img":
                var link *string = getAttr(&node.Attr, "src");
                if (link != nil) {
@@ -177,7 +181,7 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
             case "input":
                var link *string = getAttr(&node.Attr, "src");
                if (link != nil) {
-                  var newLink string = fixLink(*link, REQUEST_TYPE_JS, targetUrl);
+                  var newLink = identifyAndFixLink(*link, targetUrl);
                   replaceAttr(&node.Attr, "src", newLink);
                }
          }
