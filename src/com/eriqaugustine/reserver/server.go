@@ -13,6 +13,7 @@ import (
    "com/eriqaugustine/reserver/reserve"
    "code.google.com/p/go-html-transform/h5"
    "code.google.com/p/go.net/html"
+   "regexp"
 )
 
 func main() {
@@ -28,12 +29,6 @@ func main() {
 
 func Reserve(response http.ResponseWriter, request *http.Request) {
    var target string = request.FormValue("target");
-   //TEST
-   println("^^^^");
-   println(request.URL.String());
-   println(target);
-   println(request.FormValue("type"));
-   println("vvvv");
 
    // TODO(eriq): Does not handle user info.
    targetUrl, err := url.Parse(target);
@@ -44,46 +39,38 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
 
    var urlBase = fmt.Sprintf("%s://%s", targetUrl.Scheme, targetUrl.Host);
 
-   //TEST
-   println("Base: " + urlBase);
-
    switch request.FormValue("type") {
       case "main":
-         println("main");
          var contents *string = getModifiedMain(target, urlBase);
          if (contents != nil) {
             reserve.BasePageTemplate.Execute(response, template.HTML(*contents));
             return;
          }
       case "image":
-         println("image");
-         var contents *[]byte = getImage(target);
+         var contents *[]byte = getResource(target);
          if (contents != nil) {
             response.Write(*contents);
             return;
          }
       case "js":
-         println("js");
+         println("TODO: js");
       case "css":
-         println("css");
+         println("TODO: css");
+         var contents *[]byte = getResource(target);
+         if (contents != nil) {
+            response.Write(*contents);
+            return;
+         }
       default:
-         println("Default");
+         println("TODO: Default");
+         println(request.URL.String());
    }
 
    // Fall through to 404.
    http.NotFound(response, request);
-
-   //fmt.Printf("%s\n", string(contents))
-   //templ.Execute(w, string(contents));
-   //w.Write([]byte(string(contents)));
-   //println(string(contents));
-   //templ.Execute(w, template.HTML(string(contents)));
-   //temp2.Execute(w, template.HTML(strings.Replace(string(contents), "'", "\\'", -1)));
-   //temp2.Execute(w, strings.Replace(string(contents), "'", "\\'", -1));
 }
 
-// TODO(eriq): Make general getResource().
-func getImage(target string) *[]byte {
+func getResource(target string) *[]byte {
    response, err := http.Get(target);
 
    if (err != nil) {
@@ -118,18 +105,6 @@ func getModifiedMain(target string, urlBase string) *string {
       return rtn;
    }
    return nil;
-
-   /*TEST
-   contents, err := ioutil.ReadAll(response.Body);
-
-   if (err != nil) {
-      fmt.Printf("Read Body Error: %s\n", err)
-      return nil;
-   }
-
-   var rtn string = string(contents);
-   return &rtn;
-   */
 }
 
 func replaceLinks(responseBody io.Reader, urlBase string) *string {
@@ -143,10 +118,21 @@ func replaceLinks(responseBody io.Reader, urlBase string) *string {
       if (node.Type == html.ElementNode) {
          switch node.Data {
             case "a":
+               // TODO(eriq).
             case "img":
                var link *string = getAttr(&node.Attr, "src");
                var newLink string = fixLink(*link, "image", urlBase);
                replaceAttr(&node.Attr, "src", newLink);
+            case "style":
+               // inline CSS
+               fmt.Println("CSS 1: ", node.FirstChild.Data);
+               node.FirstChild.Data = fixCSS(node.FirstChild.Data, urlBase);
+               fmt.Println("CSS 2: ", node.FirstChild.Data);
+            case "link":
+               // CSS, favicon?
+               var link *string = getAttr(&node.Attr, "href");
+               var newLink = identifyAndFixLink(*link, urlBase);
+               replaceAttr(&node.Attr, "href", newLink);
          }
       }
    });
@@ -155,9 +141,38 @@ func replaceLinks(responseBody io.Reader, urlBase string) *string {
    return &rtn;
 }
 
+func identifyAndFixLink(link string, urlBase string) string {
+   if (strings.HasSuffix(link, ".png") ||
+       strings.HasSuffix(link, ".jpg") ||
+       strings.HasSuffix(link, ".jpeg") ||
+       strings.HasSuffix(link, ".ico") ||
+       strings.HasSuffix(link, ".gif")) {
+      return fixLink(link, "image", urlBase);
+   } else if (strings.HasSuffix(link, ".css")) {
+      return fixLink(link, "css", urlBase);
+   } else if (strings.HasSuffix(link, ".js")) {
+      return fixLink(link, "js", urlBase);
+   } else {
+      return fixLink(link, "main", urlBase);
+   }
+}
+
+func fixCSS(css string, urlBase string) string {
+   re := regexp.MustCompile(`url\s*\(['|"]?(.*)['|"]?\)`);
+   return re.ReplaceAllStringFunc(css, func(urlRule string) string {
+      var link = re.ReplaceAllString(urlRule, "$1");
+
+      // TODO(eriq): Potential problem is url is unescaped (because of quotes).
+      return fmt.Sprintf("url: ('%s')", identifyAndFixLink(link, urlBase));
+   });
+}
+
 func fixLink(link string, linkType string, urlBase string) string {
    //TODO(eriq): Relative links.
-   if (strings.HasPrefix(link, "/")) {
+   if (strings.HasPrefix(link, "//")) {
+      // Absolute.
+      return fmt.Sprintf("/?type=%s&target=http:%s", linkType, link);
+   } else if (strings.HasPrefix(link, "/")) {
       return fmt.Sprintf("/?type=%s&target=%s%s", linkType, urlBase, link);
    } else {
       return fmt.Sprintf("/?type=%s&target=%s", linkType, link);
