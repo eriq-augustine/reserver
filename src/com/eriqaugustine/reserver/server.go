@@ -87,6 +87,10 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
          if (getAndServeResource(response, request, targetUrl, userAgent, fixCSS)) {
             return;
          }
+      case REQUEST_TYPE_UNKNOWN:
+         if (getAndServeResource(response, request, targetUrl, userAgent, nil)) {
+            return;
+         }
       default:
          println("TODO: Default");
          fmt.Println("   Target: ", targetUrl);
@@ -181,12 +185,23 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
       if (node.Type == html.ElementNode) {
          switch node.Data {
             case "a":
-               fixAttribute(&node.Attr, "href", targetUrl, REQUEST_TYPE_MAIN);
+               var link *string = getAttr(&node.Attr, "href");
+               if (link != nil) {
+                  var linkType int = identifyLink(*link);
+
+                  if (linkType == REQUEST_TYPE_UNKNOWN) {
+                     linkType = REQUEST_TYPE_MAIN
+                  }
+
+                  fixAttribute(&node.Attr, "href", targetUrl, linkType);
+               }
             case "img":
                fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_IMAGE);
             case "style":
                // inline CSS
-               node.FirstChild.Data = fixCSS(node.FirstChild.Data, targetUrl);
+               if (node.FirstChild != nil && node.FirstChild.Data != "") {
+                  node.FirstChild.Data = fixCSS(node.FirstChild.Data, targetUrl);
+               }
             case "link":
                // CSS, favicon?
                fixAttribute(&node.Attr, "href", targetUrl, REQUEST_TYPE_UNKNOWN);
@@ -205,6 +220,11 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
                fixAttribute(&node.Attr, "action", targetUrl, REQUEST_TYPE_UNKNOWN);
             case "iframe":
                fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_MAIN);
+            case "body":
+               var onloadScript *string = getAttr(&node.Attr, "onload");
+               if (onloadScript != nil) {
+                  replaceAttr(&node.Attr, "onload", fixJS(*onloadScript, targetUrl));
+               }
          }
       }
    });
