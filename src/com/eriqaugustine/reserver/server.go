@@ -48,6 +48,11 @@ func Reserve(response http.ResponseWriter, request *http.Request) {
       return;
    }
 
+   if (!strings.HasPrefix(target, "http")) {
+      // Make a guess.
+      target = "http://" + target;
+   }
+
    unescapeTarget, err := url.QueryUnescape(target);
 
    if (err != nil) {
@@ -181,17 +186,24 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
       return nil;
    }
 
-   //TEST
-   /*
-   if (1 == 1) {
-      var rtn = tree.String();
-      return &rtn;
-   }
-   */
+   var headNode *html.Node = nil;
+   var bodyNode *html.Node = nil;
 
    tree.Walk(func(node *html.Node) {
       if (node.Type == html.ElementNode) {
          switch node.Data {
+            case "head":
+               // Save for later injection.
+               headNode = node;
+            case "body":
+               // Save for later injection.
+               bodyNode = node;
+
+               // handle onload
+               var onloadScript *string = getAttr(&node.Attr, "onload");
+               if (onloadScript != nil) {
+                  replaceAttr(&node.Attr, "onload", fixJS(*onloadScript, targetUrl));
+               }
             case "a":
                var link *string = getAttr(&node.Attr, "href");
                if (link != nil) {
@@ -228,11 +240,6 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
                fixAttribute(&node.Attr, "action", targetUrl, REQUEST_TYPE_UNKNOWN);
             case "iframe":
                fixAttribute(&node.Attr, "src", targetUrl, REQUEST_TYPE_MAIN);
-            case "body":
-               var onloadScript *string = getAttr(&node.Attr, "onload");
-               if (onloadScript != nil) {
-                  replaceAttr(&node.Attr, "onload", fixJS(*onloadScript, targetUrl));
-               }
             case "meta":
                var val *string = getAttr(&node.Attr, "itemprop");
                // favicon
@@ -242,6 +249,24 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
          }
       }
    });
+
+   var reader *strings.Reader;
+
+   // Inject some CSS.
+   reader = strings.NewReader(reserve.InjectedStyle);
+   styleNode, err := html.Parse(reader);
+   if (err != nil) {
+      fmt.Println("Error parsing injected style: ", err);
+   }
+   headNode.InsertBefore(styleNode, headNode.FirstChild);
+
+   // Inject the top bar.
+   reader = strings.NewReader(reserve.TopBar);
+   barNode, err := html.Parse(reader);
+   if (err != nil) {
+      fmt.Println("Error parsing injected bar: ", err);
+   }
+   bodyNode.InsertBefore(barNode, bodyNode.FirstChild);
 
    var rtn = tree.String();
    return &rtn;
