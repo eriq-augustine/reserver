@@ -313,7 +313,13 @@ func fixCSS(css string, targetUrl *url.URL) string {
 }
 
 // TODO(eriq): Need some deep parsing to get more links.
-func fixJS(css string, targetUrl *url.URL) string {
+func fixJS(js string, targetUrl *url.URL) string {
+   return js;
+
+   // TODO(eriq): Modifying JS is a dangerous game because many people
+   //  play string manipulation games with URLs.
+   // Don't modify for now.
+   /*
    // Yields three capture groups: open quote, link, close quote.
    re := regexp.MustCompile(`(?:(?:(')(https?://[^']*)('))|(?:(")(https?://[^"]*)(")))`);
    return re.ReplaceAllStringFunc(css, func(quotedLink string) string {
@@ -333,6 +339,7 @@ func fixJS(css string, targetUrl *url.URL) string {
 
       return fmt.Sprintf("%s%s%s", quote, identifyAndFixLink(link, targetUrl), quote);
    });
+   */
 }
 
 func fixLink(link string, linkType int, targetUrl *url.URL) string {
