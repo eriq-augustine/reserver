@@ -32,6 +32,7 @@ func main() {
    var port *string = flag.String("port", "3030", "service port");
    flag.Parse()
 
+   http.Handle("/start", http.HandlerFunc(StartHandler))
    http.Handle("/", http.HandlerFunc(Reserve))
    err := http.ListenAndServe(":" + *port, nil)
    if err != nil {
@@ -39,17 +40,21 @@ func main() {
    }
 }
 
+func StartHandler(response http.ResponseWriter, request *http.Request) {
+   fmt.Fprint(response, reserve.StartPage);
+}
+
 func Reserve(response http.ResponseWriter, request *http.Request) {
    var userAgent string = request.UserAgent();
    var target string = request.FormValue("target");
 
    if (target == "") {
-      http.NotFound(response, request);
+      StartHandler(response, request);
       return;
    }
 
    if (!strings.HasPrefix(target, "http")) {
-      // Make a guess.
+      // Guess http.
       target = "http://" + target;
    }
 
