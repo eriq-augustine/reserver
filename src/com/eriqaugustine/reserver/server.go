@@ -181,6 +181,14 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
       return nil;
    }
 
+   //TEST
+   /*
+   if (1 == 1) {
+      var rtn = tree.String();
+      return &rtn;
+   }
+   */
+
    tree.Walk(func(node *html.Node) {
       if (node.Type == html.ElementNode) {
          switch node.Data {
@@ -224,6 +232,12 @@ func replaceLinks(responseBody io.Reader, targetUrl *url.URL) *string {
                var onloadScript *string = getAttr(&node.Attr, "onload");
                if (onloadScript != nil) {
                   replaceAttr(&node.Attr, "onload", fixJS(*onloadScript, targetUrl));
+               }
+            case "meta":
+               var val *string = getAttr(&node.Attr, "itemprop");
+               // favicon
+               if (val != nil && *val == "image") {
+                  fixAttribute(&node.Attr, "content", targetUrl, REQUEST_TYPE_UNKNOWN);
                }
          }
       }
@@ -275,16 +289,26 @@ func identifyAndFixLink(link string, targetUrl *url.URL) string {
 }
 
 func fixCSS(css string, targetUrl *url.URL) string {
-   re := regexp.MustCompile(`url\s*\(['"]?(.*)['"]?\)`);
+   re := regexp.MustCompile(`(?:url\s*\((')([^']*)(')\))|(?:url\s*\((")([^"]*)(")\))|(?:url\s*\(([^\)]*)\))`);
    return re.ReplaceAllStringFunc(css, func(urlRule string) string {
-      var link = re.ReplaceAllString(urlRule, "$1");
+      var match [][]string = re.FindAllStringSubmatch(urlRule, -1);
 
-      // TODO(eriq): The trailing "'" should not be caught by the group.
-      //  Fix the regex and remove this.
-      link = strings.TrimRight(link, "'\"");
+      var quote string;
+      var link string;
 
-      // TODO(eriq): Potential problem is url is unescaped (because of quotes).
-      return fmt.Sprintf("url('%s')", identifyAndFixLink(link, targetUrl));
+      // Go does not ignore branched capture groups.
+      if(match[0][1] != "") {
+         quote = match[0][1];
+         link = match[0][2];
+      } else if (match[0][4] != "") {
+         quote = match[0][4];
+         link = match[0][5];
+      } else {
+         quote = "";
+         link = match[0][7];
+      }
+
+      return fmt.Sprintf("url(%s%s%s)", quote, identifyAndFixLink(link, targetUrl), quote);
    });
 }
 
