@@ -29,7 +29,7 @@ const (
 );
 
 func main() {
-   var port *string = flag.String("port", "3030", "service port");
+   var port *string = flag.String("port", "3333", "service port");
    flag.Parse()
 
    http.Handle("/start", http.HandlerFunc(StartHandler))
